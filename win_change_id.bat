@@ -1,42 +1,47 @@
 @echo off
 setlocal EnableDelayedExpansion
 
-:: Set configuration file path
+:: Cursor ID 更改工具 - Windows 批处理版本
+:: 此脚本用于修改 Windows 上 Cursor 编辑器的机器标识符，创建新的身份标识
+:: 使用方法: 双击运行此批处理文件
+
+:: 设置配置文件路径
 set "STORAGE_FILE=%APPDATA%\Cursor\User\globalStorage\storage.json"
 
-echo Starting script...
-echo Target file path: %STORAGE_FILE%
+echo 开始运行脚本...
+echo 目标文件路径: %STORAGE_FILE%
 
-:: Generate random IDs in correct format
-:: Generate machineId (40-character hex)
+:: 生成正确格式的随机 ID
+:: 生成 machineId (40字符十六进制)
 powershell -Command "$bytes = New-Object Byte[] 32; (New-Object Security.Cryptography.RNGCryptoServiceProvider).GetBytes($bytes); -join ($bytes | ForEach-Object { $_.ToString('x2') })" > "%TEMP%\guid1.txt"
 if errorlevel 1 goto :error
 set /p NEW_MACHINE_ID=<"%TEMP%\guid1.txt"
 
-:: Generate macMachineId (40-character hex)
+:: 生成 macMachineId (40字符十六进制)
 powershell -Command "$bytes = New-Object Byte[] 32; (New-Object Security.Cryptography.RNGCryptoServiceProvider).GetBytes($bytes); -join ($bytes | ForEach-Object { $_.ToString('x2') })" > "%TEMP%\guid2.txt"
 if errorlevel 1 goto :error
 set /p NEW_MAC_MACHINE_ID=<"%TEMP%\guid2.txt"
 
-:: Generate sqmId (UUID with braces)
+:: 生成 sqmId (带大括号的大写 UUID)
 powershell -Command "$guid = [guid]::NewGuid(); '{' + $guid.ToString().ToUpper() + '}'" > "%TEMP%\guid3.txt"
 if errorlevel 1 goto :error
 set /p NEW_SQM_ID=<"%TEMP%\guid3.txt"
 
-:: Generate devDeviceId (standard UUID)
+:: 生成 devDeviceId (标准 UUID 格式)
 powershell -Command "[guid]::NewGuid().ToString()" > "%TEMP%\guid4.txt"
 if errorlevel 1 goto :error
 set /p NEW_DEV_DEVICE_ID=<"%TEMP%\guid4.txt"
 
-:: Clean up temporary files
+:: 清理临时文件
 del "%TEMP%\guid1.txt" "%TEMP%\guid2.txt" "%TEMP%\guid3.txt" "%TEMP%\guid4.txt"
 
-:: Create backup
+:: 创建备份
 if exist "%STORAGE_FILE%" (
     copy "%STORAGE_FILE%" "%STORAGE_FILE%.backup_%date:~0,4%%date:~5,2%%date:~8,2%_%time:~0,2%%time:~3,2%%time:~6,2%" >nul
 )
 
-:: Create and execute update script
+:: 创建并执行更新脚本
+:: 使用 PowerShell 进行 JSON 处理更可靠
 (
     echo $ErrorActionPreference = 'Stop'
     echo try {
@@ -52,20 +57,22 @@ if exist "%STORAGE_FILE%" (
     echo }
 ) > "%TEMP%\update_json.ps1"
 
+:: 以绕过执行策略的方式运行 PowerShell 脚本
 powershell -ExecutionPolicy Bypass -File "%TEMP%\update_json.ps1"
 if errorlevel 1 (
     del "%TEMP%\update_json.ps1"
     goto :error
 )
 
+:: 删除临时 PowerShell 脚本
 del "%TEMP%\update_json.ps1"
 
-echo Operation completed successfully!
+echo 操作成功完成！
 goto :end
 
 :error
-echo Script execution error!
-echo Please make sure Cursor editor is closed and you have sufficient file access permissions.
+echo 脚本执行出错！
+echo 请确保 Cursor 编辑器已关闭且您有足够的文件访问权限。
 
 :end
 pause
